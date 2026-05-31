@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="VirtualOS X — A browser-based virtual operating system dashboard with dynamic Windows 11, macOS Sonoma, and Ubuntu GNOME themes.">
+    <title>VirtualOS X — Multi-Theme Operating System</title>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/desktop.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/apps.css">
+
+    <style>
+        /* Disables animations when settings option is toggled off */
+        .desktop-container.animations-disabled *, 
+        .desktop-container.animations-disabled *::before, 
+        .desktop-container.animations-disabled *::after {
+            transition: none !important;
+            animation: none !important;
+        }
+
+        /* Cinematic Boot/Loading screen */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, #0f1026 0%, #05050c 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+            gap: 24px;
+        }
+        .loading-screen.hidden { opacity: 0; pointer-events: none; }
+        .loading-logo-glow {
+            position: relative;
+            font-size: 4rem;
+            animation: pulseGlow 2.5s infinite ease-in-out;
+            filter: drop-shadow(0 0 25px rgba(0, 180, 216, 0.6));
+        }
+        .loading-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.85);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+        .loading-bar {
+            width: 220px;
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 0.5px solid rgba(255, 255, 255, 0.1);
+        }
+        .loading-bar-inner {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #00b4d8, #7b2ff7, #00b4d8);
+            background-size: 200% 100%;
+            border-radius: 4px;
+            animation: loadSlide 1.5s infinite linear, moveGrad 3s infinite linear;
+        }
+        @keyframes pulseGlow { 0%,100% { opacity: 0.7; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.03); } }
+        @keyframes loadSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes moveGrad { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-logo-glow">🖥️</div>
+        <div class="loading-text">VirtualOS X</div>
+        <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+    </div>
+
+    <!-- Cinematic Lock / Sign In Screen -->
+    <div class="auth-container" id="auth-screen" style="display:none;">
+        <!-- Lock Screen Wallpaper Overlay -->
+        <div class="lock-screen-wallpaper"></div>
+        
+        <!-- Lock Screen Overlay (Clock & Notification) -->
+        <div class="lock-screen-panel" id="lock-screen-panel">
+            <div class="lock-screen-clock">
+                <div id="lock-time">10:50</div>
+                <div id="lock-date">Friday, May 29</div>
+            </div>
+            <div class="lock-screen-notification">
+                <div class="lock-notif-icon">🔒</div>
+                <div class="lock-notif-text">Click anywhere to unlock VirtualOS X</div>
+            </div>
+        </div>
+
+        <!-- Floating Glass Login Card (Hidden initially) -->
+        <div class="auth-card" id="auth-card" style="display:none;">
+            <div class="auth-header">
+                <div class="auth-user-avatar" id="auth-avatar-display">U</div>
+                <h1 id="auth-title">Welcome Back</h1>
+                <p id="auth-subtitle">Sign in to your VirtualOS X session</p>
+            </div>
+            <div class="auth-error" id="auth-error"></div>
+            <form class="auth-form" id="auth-form" data-mode="login" autocomplete="off">
+                <div class="input-group">
+                    <label for="auth-username">Username</label>
+                    <input type="text" id="auth-username" placeholder="Enter username" required minlength="3" maxlength="20">
+                </div>
+                <div class="input-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="Enter password" required minlength="6">
+                </div>
+                <button type="submit" class="auth-btn" id="auth-submit-btn">Unlock Workspace</button>
+            </form>
+            <div class="auth-footer" id="auth-footer-text">
+                Don't have an account? <a onclick="VOS.Auth.showSignupForm()">Register Profile</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Desktop Workspace Container -->
+    <!-- Modified by ThemeEngine to support: .os-win11, .os-macos, .os-ubuntu -->
+    <div class="desktop-container" id="desktop" style="display:none;">
+        <!-- TOP NAVIGATION BAR (Used for macOS Menu Bar & Ubuntu Activities Bar) -->
+        <div class="desktop-topbar" id="desktop-topbar" style="display: none;">
+            <div class="topbar-left" id="topbar-left-content">
+                <!-- Dynamically populated based on active OS theme -->
+            </div>
+            <div class="topbar-center" id="topbar-center-content">
+                <!-- Dynamically populated based on active OS theme -->
+            </div>
+            <div class="topbar-right" id="topbar-right-content">
+                <!-- System Tray Indicators & Clock -->
+            </div>
+        </div>
+
+        <!-- LEFT SIDEBAR LAUNCHER (Used for Ubuntu GNOME dock) -->
+        <div class="desktop-left-dock" id="desktop-left-dock" style="display: none;">
+            <div class="left-dock-icons" id="left-dock-icons-grid">
+                <!-- Dynamically rendered -->
+            </div>
+        </div>
+
+        <!-- Main Workspace Area -->
+        <div class="desktop-screen" id="desktop-screen">
+            <!-- Desktop Grid & Icons -->
+            <div class="desktop-icons-grid" id="desktop-icons">
+                <div class="desktop-icon" data-app="notes">
+                    <div class="desktop-icon-img">📝</div>
+                    <span class="desktop-icon-label">Notes</span>
+                </div>
+                <div class="desktop-icon" data-app="calculator">
+                    <div class="desktop-icon-img">🧮</div>
+                    <span class="desktop-icon-label">Calculator</span>
+                </div>
+                <div class="desktop-icon" data-app="filemanager">
+                    <div class="desktop-icon-img">📁</div>
+                    <span class="desktop-icon-label">Files</span>
+                </div>
+                <div class="desktop-icon" data-app="terminal">
+                    <div class="desktop-icon-img">💻</div>
+                    <span class="desktop-icon-label">Terminal</span>
+                </div>
+                <div class="desktop-icon" data-app="settings">
+                    <div class="desktop-icon-img">⚙️</div>
+                    <span class="desktop-icon-label">Settings</span>
+                </div>
+                <div class="desktop-icon" data-app="music">
+                    <div class="desktop-icon-img">🎵</div>
+                    <span class="desktop-icon-label">Music</span>
+                </div>
+            </div>
+
+            <!-- Dynamic Glass Desktop Widgets Panel -->
+            <div class="desktop-widgets-panel" id="desktop-widgets-panel">
+                <div class="widget-card widget-clock">
+                    <div class="widget-clock-time" id="widget-clock-time">10:50 AM</div>
+                    <div class="widget-clock-date" id="widget-clock-date">Friday, May 29</div>
+                </div>
+                <div class="widget-card widget-weather">
+                    <div class="weather-row">
+                        <span class="weather-temp">72°F</span>
+                        <span class="weather-icon">☀️</span>
+                    </div>
+                    <div class="weather-desc">Sunny — San Francisco</div>
+                </div>
+                <div class="widget-card widget-music-mini">
+                    <div class="widget-header">🎵 Mini Player</div>
+                    <div class="widget-body">
+                        <div class="widget-music-info" style="display:flex;flex-direction:column;gap:2px;margin-bottom:8px;">
+                            <span class="widget-music-title" id="widget-music-title" style="font-weight:600;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">Not Playing</span>
+                            <span class="widget-music-artist" id="widget-music-artist" style="font-size:0.7rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">—</span>
+                        </div>
+                        <div class="widget-music-controls" style="display:flex;gap:12px;align-items:center;">
+                            <button id="widget-music-play-btn" style="background:var(--accent-color);border:none;cursor:pointer;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.75rem;">▶</button>
+                            <button id="widget-music-next-btn" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:inherit;font-size:0.75rem;">⏭</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="widget-card widget-ai">
+                    <div class="widget-header">🤖 Copilot Widget</div>
+                    <div class="widget-body">
+                        <p class="widget-ai-bubble">Hello! Ask me anything about VirtualOS X.</p>
+                        <input type="text" class="widget-ai-input" id="widget-ai-input" placeholder="Ask AI assistant...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Windows Container -->
+            <div id="windows-container"></div>
+
+            <!-- Notifications Tray Container -->
+            <div class="notifications-container" id="notifications-container"></div>
+
+            <!-- Custom Right-Click Context Menu -->
+            <div class="context-menu" id="context-menu"></div>
+        </div>
+
+        <!-- Start Menu for Windows Style -->
+        <div class="start-menu" id="start-menu">
+            <div class="start-search-bar">
+                <input type="text" class="start-search-input" id="start-search" placeholder="🔍 Search apps...">
+            </div>
+            <div class="start-apps-container">
+                <div class="start-section-title">Pinned Apps</div>
+                <div class="start-apps-grid" id="start-apps-grid"></div>
+            </div>
+            <div class="start-profile-bar">
+                <div class="start-profile-info">
+                    <div class="start-avatar" id="start-avatar">U</div>
+                    <span class="start-username" id="start-username">User</span>
+                </div>
+                <div class="start-power-btn" id="start-logout" title="Sign Out">⏻</div>
+            </div>
+        </div>
+
+        <!-- WINDOWS STYLE TASKBAR -->
+        <div class="taskbar" id="windows-taskbar">
+            <div class="taskbar-left">
+                <div class="start-button" id="start-button" title="Start Menu">🪟</div>
+                <div class="taskbar-widgets-btn" id="taskbar-widgets-btn" title="Toggle Widgets">📊</div>
+            </div>
+            <div class="taskbar-center" id="taskbar-center">
+                <!-- Dynamically rendered by taskbar.js -->
+            </div>
+            <div class="taskbar-right">
+                <div class="system-tray">
+                    <div class="notification-tray-btn" title="Notifications">🔔</div>
+                    <div class="system-clock" id="system-clock">
+                        <div>--:--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- macOS FLOATING DOCK -->
+        <div class="macos-floating-dock" id="macos-floating-dock" style="display: none;">
+            <div class="macos-dock-container" id="macos-dock-icons-grid">
+                <!-- Dynamically rendered -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules (order matters) -->
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/themeengine.js"></script>
+    <script src="js/components/notifications.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/wm.js"></script>
+    <script src="js/apps/notes.js"></script>
+    <script src="js/apps/calculator.js"></script>
+    <script src="js/apps/filemanager.js"></script>
+    <script src="js/apps/terminal.js"></script>
+    <script src="js/apps/settings.js"></script>
+    <script src="js/apps/music.js"></script>
+    <script src="js/apps/sysmonitor.js"></script>
+    <script src="js/components/taskbar.js"></script>
+    <script src="js/components/startmenu.js"></script>
+    <script src="js/components/contextmenu.js"></script>
+    <script src="js/main.js"></script>
+
+    <!-- Loading Screen transition logic -->
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('loading-screen');
+                if (loader) {
+                    loader.classList.add('hidden');
+                    setTimeout(() => loader.remove(), 800);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
