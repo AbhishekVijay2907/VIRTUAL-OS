@@ -174,29 +174,6 @@ or host it using any local server.
 
 ---
 
-## 📸 Screenshots
-
-### Windows Theme
-
-Add screenshot here
-
-### macOS Theme
-
-Add screenshot here
-
-### Linux Theme
-
-Add screenshot here
-
-### File Manager
-
-Add screenshot here
-
-### Notes Application
-
-Add screenshot here
-
----
 
 ## 🔒 Security Features
 
